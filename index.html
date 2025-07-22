@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>WanChai INI File Editor (Web版)</title>
+    <meta name="viewport" content="width=1200">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f5f6fa;
+        }
+
+        .tree-table th,
+        .tree-table td {
+            font-size: 14px;
+        }
+
+        .tree-table th {
+            background: #e6eaf2;
+            color: #222;
+        }
+
+        .tree-table tr.selected {
+            background: #90caf9 !important;
+        }
+
+        .overlay {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 10;
+            font-size: 1.5rem;
+            color: #888;
+        }
+
+        .tab-content {
+            min-height: 400px;
+        }
+
+        .context-menu {
+            position: absolute;
+            z-index: 9999;
+            background: #fff;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 8px #aaa;
+            display: none;
+        }
+
+        .context-menu li {
+            padding: 6px 20px;
+            cursor: pointer;
+        }
+
+        .context-menu li:hover {
+            background: #eee;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid py-3">
+        <h2 id="app-title">WanChai INI File Editor(Web)</h2>
+        <div class="mb-2">
+            <label for="fileInput" class="form-label">INI File:</label>
+            <input type="file" id="fileInput" accept=".ini" class="form-control d-inline-block" style="width:50%;">
+            <button class="btn btn-primary ms-2" id="btnExport">Export</button>
+            <button class="btn btn-secondary ms-2" id="btnReload">Reload</button>
+            <button class="btn btn-danger ms-2" id="btnInit">Initialize</button>
+            <span id="fileName" class="ms-3 text-muted" style="display:none;"></span>
+        </div>
+
+        <div class="row mt-3 mb-3">
+            <div class="col-auto">
+                <label>SKU:</label>
+                <select id="skuSelect" class="form-select d-inline-block" style="width:180px;"></select>
+            </div>
+            <div class="col-auto">
+                <input type="text" id="skuSuffix" class="form-control" placeholder="SKU suffix" style="width:120px;"
+                    value="_GRC">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-primary" id="btnAddSuffix">Add suffix</button>
+                <button class="btn btn-outline-primary" id="btnAddSuffixes">Add suffixes</button>
+                <button class="btn btn-outline-secondary" id="btnBackspace">Backspace</button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-info" id="btnPrevSku">Previous SKU</button>
+                <button class="btn btn-outline-info" id="btnNextSku">Next SKU</button>
+            </div>
+            <div class="col-auto d-flex align-items-center">
+                <input type="text" id="searchInput" class="form-control me-2" placeholder="Search..."
+                    style="width:200px;">
+                <button class="btn btn-outline-secondary" id="btnClearSearch">Clear</button>
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active d-flex align-items-center gap-2" id="tests-tab" data-bs-toggle="tab" data-bs-target="#tests"
+                    type="button" role="tab">
+                    Test Items
+                    <span id="skuCount" class="badge bg-success">0 items</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button"
+                    role="tab">Info</button>
+            </li>
+        </ul>
+        <div class="tab-content position-relative" id="mainTabsContent">
+            <!-- Test Items Tab -->
+            <div class="tab-pane fade show active" id="tests" role="tabpanel">
+
+                <div class="position-relative mt-3" style="min-height:400px;">
+                    <table class="table table-bordered tree-table" id="testTable">
+                        <thead>
+                            <tr>
+                                <th>Index</th>
+                                <th>Identifier</th>
+                                <th>TestID</th>
+                                <th>Description</th>
+                                <th>Enabled</th>
+                                <th>StringLimit</th>
+                                <th>LowLimit</th>
+                                <th>HighLimit</th>
+                                <th>LimitType</th>
+                                <th>Unit</th>
+                                <th>Parameters</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Info Tab -->
+            <div class="tab-pane fade" id="info" role="tabpanel">
+                <div class="row mt-3">
+                    <div class="col-3">
+                        <label>UnitCount:</label>
+                        <input type="text" id="unitCount" class="form-control">
+                    </div>
+                    <div class="col-4">
+                        <label>Export Date:</label>
+                        <input type="text" id="exportDate" class="form-control">
+                    </div>
+                    <div class="col-2 d-flex align-items-end">
+                        <button class="btn btn-outline-primary" id="btnUpdateDate">Update Date</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 编辑弹窗、右键菜单等后续用JS动态生成 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="wanchai-editor-web.js"></script>
+</body>
+
+</html>
