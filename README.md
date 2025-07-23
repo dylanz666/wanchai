@@ -171,3 +171,8 @@ Count=49
 ### v1.0.0-beta.4
 - Added cut functionality(ctrl+x)
 - Update README.md
+
+### v1.0.0
+- Update export file name to include [].
+- Release first standard version of desktop version.
+- Develop web version and release first standard version of it.
