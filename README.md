@@ -179,3 +179,6 @@ Count=49
 - Update export file name to include [].
 - Release first standard version of desktop version.
 - Develop web version and release first standard version of it.
+
+## v1.0.1
+- Add Cut and Paste entries to context menu and implement features accordingly.

@@ -648,6 +648,8 @@ class WanchaiEditor:
         self.context_menu.add_command(
             label="Copy To Other SKUs", command=self.copy_to_all_skus
         )
+        self.context_menu.add_command(label="Cut", command=self.cut_selected_item)
+        self.context_menu.add_command(label="Paste", command=self.paste_selected_item)
         self.context_menu.add_command(label="Delete", command=self.delete_selected_item)
         self.tree.bind("<Button-3>", self.show_context_menu)
 
@@ -2453,6 +2455,210 @@ class WanchaiEditor:
         self._dragging_item = None
         if hasattr(self, "_dragging_item") and self._dragging_item:
             self.tree.item(self._dragging_item, tags=())
+
+    def cut_selected_item(self):
+        """剪切选中行到剪贴板，并从当前SKU删除"""
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showinfo("Cut", "Please select at least one row to cut.")
+            return
+        header = "(Identifier,TestID,Description,Enabled,StringLimit,LowLimit,HighLimit,LimitType,Unit,Parameters)"
+        current_sku = self.sku_var.get() if hasattr(self, "sku_var") else ""
+        # 构建 index 到 row 的映射（当前 SKU）
+        index_to_row = {
+            str(row[0]): row
+            for (row, sku) in self._all_rows_with_sku
+            if sku == current_sku
+        }
+        ui_order = list(self.tree.get_children())
+        selected_ui_pos = [(ui_order.index(item), item) for item in selected]
+        selected_ui_pos.sort()
+
+        def format_row_export(row):
+            formatted = []
+            for i, v in enumerate(row):
+                if i == 3 and str(v) in ("0", "1"):
+                    formatted.append(str(v))
+                else:
+                    formatted.append(f"'{v}'")
+            return f"({','.join(formatted)})"
+
+        rows = []
+        selected_indices = set()
+        for idx, (ui_pos, item) in enumerate(selected_ui_pos, 1):
+            values = self.tree.item(item)["values"]
+            index = str(values[0])
+            row = index_to_row.get(index, list(values))
+            export_row = [row[1]] + list(row[2:])
+            line = f"{row[0]}={header} VALUES {format_row_export(export_row)}"
+            rows.append(line)
+            selected_indices.add(index)
+        text = "\n".join(rows)
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        self.root.update()
+
+        # 删除选中项（从 _all_rows_with_sku 和 _all_rows）
+        # 只删除当前 SKU 下的选中项
+        new_all_rows_with_sku = []
+        for row, sku in self._all_rows_with_sku:
+            if sku == current_sku and str(row[0]) in selected_indices:
+                continue
+            new_all_rows_with_sku.append((row, sku))
+        self._all_rows_with_sku = new_all_rows_with_sku
+        self._all_rows = [row for (row, sku) in self._all_rows_with_sku]
+        self.renumber_index_for_current_sku()
+
+        def show_toast(msg, duration=2000):
+            toast = tk.Toplevel(self.root)
+            toast.overrideredirect(True)
+            toast.attributes("-topmost", True)
+            toast.configure(bg="#333")
+            label = tk.Label(
+                toast,
+                text=msg,
+                fg="white",
+                bg="#333",
+                font=("Segoe UI", 12),
+                padx=20,
+                pady=10,
+            )
+            label.pack()
+            self.root.update_idletasks()
+            x = (
+                self.root.winfo_rootx()
+                + self.root.winfo_width() // 2
+                - toast.winfo_reqwidth() // 2
+            )
+            y = self.root.winfo_rooty() + 60
+            toast.geometry(f"+{x}+{y}")
+            toast.after(duration, toast.destroy)
+
+        show_toast("Selected items are cut to clipboard.")
+
+    def paste_selected_item(self):
+        """从剪贴板粘贴 test item/items 到当前选中区块最后一行的下一个位置（与 Ctrl+V 逻辑一致）"""
+        try:
+            text = self.root.clipboard_get()
+        except Exception:
+            return
+        if not text:
+            return
+        pattern = r"^(\d+)=.*?VALUES \((.*)\)$"
+        lines = text.strip().splitlines()
+        parsed_rows = []
+        for line in lines:
+            m = re.match(r"^(\d+)=.*?VALUES \((.*)\)$", line)
+            if not m:
+                continue
+            values_str = m.group(2)
+            values = []
+            current = ""
+            in_quotes = False
+            i = 0
+            while i < len(values_str):
+                c = values_str[i]
+                if c == "'":
+                    in_quotes = not in_quotes
+                    current += c
+                elif c == "," and not in_quotes:
+                    v = current.strip()
+                    if v.startswith("'") and v.endswith("'"):
+                        v = v[1:-1]
+                    values.append(v)
+                    current = ""
+                else:
+                    current += c
+                i += 1
+            if current:
+                v = current.strip()
+                if v.startswith("'") and v.endswith("'"):
+                    v = v[1:-1]
+                values.append(v)
+            if len(values) != 10:
+                continue
+            parsed_rows.append(values)
+        if not parsed_rows:
+            return
+        current_sku = self.sku_var.get() if hasattr(self, "sku_var") else ""
+        if not current_sku:
+            return
+        columns = getattr(self, "_test_columns", None)
+        id_idx = (
+            columns.index("Identifier")
+            if columns and "Identifier" in columns
+            else 1
+        )
+        selected = self.tree.selection()
+        sku_indices = [
+            i
+            for i, (row, sku) in enumerate(self._all_rows_with_sku)
+            if sku == current_sku
+        ]
+        insert_at = None
+        if selected:
+            ui_order = list(self.tree.get_children())
+            selected_ui_pos = [(ui_order.index(item), item) for item in selected]
+            selected_ui_pos.sort()
+            last_selected_item = selected_ui_pos[-1][1]
+            last_selected_index = str(self.tree.item(last_selected_item)["values"][0])
+            insert_at = None
+            for idx in reversed(sku_indices):
+                if str(self._all_rows_with_sku[idx][0][0]) == last_selected_index:
+                    insert_at = idx + 1
+                    break
+            if insert_at is None:
+                insert_at = (
+                    sku_indices[-1] + 1
+                    if sku_indices
+                    else len(self._all_rows_with_sku)
+                )
+        else:
+            insert_at = (
+                sku_indices[-1] + 1 if sku_indices else len(self._all_rows_with_sku)
+            )
+        next_index = str(len(sku_indices) + 1)
+        if selected and insert_at > sku_indices[0]:
+            prev_idx = None
+            for idx in reversed(sku_indices):
+                if idx < insert_at:
+                    prev_idx = idx
+                    break
+            if prev_idx is not None:
+                next_index = str(int(self._all_rows_with_sku[prev_idx][0][0]) + 1)
+        for row_values in parsed_rows:
+            new_row = [next_index] + list(row_values)
+            new_row[id_idx] = current_sku
+            self._all_rows_with_sku.insert(insert_at, (new_row, current_sku))
+            self._all_rows.insert(insert_at, new_row)
+            insert_at += 1
+            next_index = str(int(next_index) + 1)
+        self.renumber_index_for_current_sku()
+        def show_toast(msg, duration=2000):
+            toast = tk.Toplevel(self.root)
+            toast.overrideredirect(True)
+            toast.attributes("-topmost", True)
+            toast.configure(bg="#333")
+            label = tk.Label(
+                toast,
+                text=msg,
+                fg="white",
+                bg="#333",
+                font=("Segoe UI", 12),
+                padx=20,
+                pady=10,
+            )
+            label.pack()
+            self.root.update_idletasks()
+            x = (
+                self.root.winfo_rootx()
+                + self.root.winfo_width() // 2
+                - toast.winfo_reqwidth() // 2
+            )
+            y = self.root.winfo_rooty() + 60
+            toast.geometry(f"+{x}+{y}")
+            toast.after(duration, toast.destroy)
+        show_toast("Items are pasted to the list.")
 
 
 def main():

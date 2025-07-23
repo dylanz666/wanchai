@@ -620,8 +620,10 @@ function enableContextMenu() {
     <li data-action="edit">Edit</li>
     <li data-action="insert-before">Insert Before</li>
     <li data-action="insert-after">Insert After</li>
-    <li data-action="copy">Copy</li>
+    <li data-action="copy">Copy</li>    
     <li data-action="copy-to-all">Copy To Other SKUs</li>
+    <li data-action="cut">Cut</li>
+    <li data-action="paste">Paste</li>
     <li data-action="delete">Delete</li>
   `;
 
@@ -652,6 +654,59 @@ function enableContextMenu() {
       if (selectedRowIndices.length === 1) insertTestItem(selectedRowIndices[0], false);
     } else if (action === 'copy') {
       copySelectedRowsToClipboard();
+    } else if (action === 'cut') {
+      // 实现剪切：与 Ctrl+X 逻辑一致
+      let rows = allRowsWithSku.filter(item => item.sku === currentSku);
+      let selectedRows = selectedRowIndices.map(idx => rows[idx]).filter(Boolean);
+      if (!selectedRows.length) return;
+      const header = "(Identifier,TestID,Description,Enabled,StringLimit,LowLimit,HighLimit,LimitType,Unit,Parameters)";
+      let lines = selectedRows.map(item => {
+        let exportRow = item.row.slice(1);
+        let formatted = exportRow.map((v, i) => (i === 2 && (v === "0" || v === "1")) ? v : `'${v}'`).join(",");
+        return `${item.row[0]}=${header} VALUES (${formatted})`;
+      });
+      try { navigator.clipboard.writeText(lines.join('\n')); showAutoDismissMessage(selectedRows.length == 1 ? 'Item is cut!' : 'Items are cut!'); } catch { }
+      // 删除选中行
+      let indices = selectedRowIndices.map(idx => rows[idx]?.row[0]);
+      let toDelete = new Set(indices);
+      allRowsWithSku = allRowsWithSku.filter(item => !(item.sku === currentSku && toDelete.has(item.row[0]) && (!searchTerm || item.row.some(v => String(v).toLowerCase().includes(searchTerm)))));
+      // 重新编号当前 SKU 下所有行的 Index
+      let newSkuRows = allRowsWithSku.filter(item => item.sku === currentSku);
+      newSkuRows.forEach((item, idx) => { item.row[0] = (idx + 1).toString(); });
+      selectedRowIndices = [];
+      renderTable();
+    } else if (action === 'paste') {
+      // 粘贴逻辑，与 Ctrl+V 一致
+      (async function() {
+        try {
+          let text = await navigator.clipboard.readText();
+          let pastedRows = [];
+          text.split(/\r?\n/).forEach(line => {
+            let m = line.match(/^\s*(\d+)\s*=\s*\(Identifier,TestID,Description,Enabled,StringLimit,LowLimit,HighLimit,LimitType,Unit,Parameters\)\s*VALUES\s*\((.*)\)\s*$/);
+            if (m) {
+              let idx = m[1];
+              let values = parseRowValues(m[2]);
+              pastedRows.push([idx, ...values]);
+            }
+          });
+          if (!pastedRows.length) return;
+          let maxIdx = Math.max(...selectedRowIndices, -1);
+          let insertAt = maxIdx + 1;
+          let visibleRows = allRowsWithSku
+            .map((item, i) => ({ item, i }))
+            .filter(({ item }) => item.sku === currentSku && (!searchTerm || item.row.some(v => String(v).toLowerCase().includes(searchTerm))));
+          let globalInsertAt = visibleRows[insertAt]?.i ?? allRowsWithSku.length;
+          pastedRows.forEach(row => {
+            let newRow = ["TMP", ...row.slice(1)];
+            allRowsWithSku.splice(globalInsertAt, 0, { row: newRow, sku: currentSku });
+            globalInsertAt++;
+          });
+          let newSkuRows = allRowsWithSku.filter(item => item.sku === currentSku);
+          newSkuRows.forEach((item, idx) => { item.row[0] = (idx + 1).toString(); });
+          renderTable();
+          showAutoDismissMessage(pastedRows.length == 1 ? 'Item is pasted!' : 'Items are pasted!');
+        } catch {}
+      })();
     } else if (action === 'copy-to-all') {
       copyToAllSkus(selectedRowIndices);
     } else if (action === 'delete') {
