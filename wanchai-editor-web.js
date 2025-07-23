@@ -680,7 +680,7 @@ function showEditDialog(rowIndex, type = 'edit') {
   if (type === 'insert-before') title = 'Insert Test Item (Before)';
   if (type === 'insert-after') title = 'Insert Test Item (After)';
   dialog.innerHTML = `
-    <div class="modal-dialog modal-md" style="max-width:600px;">
+    <div class="modal-dialog modal-lg" style="max-width:700px;">
       <div class="modal-content" style="font-size:14px;">
         <div class="modal-header" style="padding:8px 14px;">
           <h5 class="modal-title" style="font-size:16px;">${title}</h5>
@@ -690,24 +690,24 @@ function showEditDialog(rowIndex, type = 'edit') {
           <form id="editTestItemForm">
             ${testColumns.map((col, i) => `
               <div class="mb-1 row" style="margin-bottom:4px !important;">
-                <label class="col-sm-4 col-form-label" style="font-size:13px;padding-right:4px;">${col}:</label>
+                <label class="col-sm-4 col-form-label" style="font-size:15px;padding-right:4px;">${col}:</label>
                 <div class="col-sm-8">
                   ${col === 'Index'
-      ? `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" readonly>`
+      ? `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" readonly style="font-size:14px;">`
       : col === 'Parameters'
-        ? `<textarea class="form-control form-control-sm" name="${col}" rows="2" style="font-size:12px;">${row[i] || ''}</textarea>`
-        : `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" style="font-size:12px;">`
+        ? `<textarea class="form-control form-control-sm" name="${col}" rows="2" style="font-size:14px;">${row[i] || ''}</textarea>`
+        : `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" style="font-size:14px;">`
     }
                 </div>
               </div>
             `).join('')}
             ${(type === 'edit') ? `<div class="mb-1" id="applyChangeToOptions" style="margin-bottom:6px !important;">
-              <div style="font-weight:bold;font-size:12px;margin-bottom:2px;">Apply Change To</div>
+              <div style="font-weight:bold;font-size:16px;margin-bottom:2px;">Apply Change To:</div>
               <div>
-                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="all_by_field" checked> All SKUs + Exact field</label><br>
-                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="all"> All SKUs + Any fields</label><br>
-                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="sku_by_field"> Current SKU only + Exact fields</label><br>
-                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="sku_only"> Current SKU only + Any fields</label><br>
+                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="all_by_field" checked> All SKUs + Exact field ---> Handle modified fields which have same original value.</label><br>
+                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="all"> All SKUs + Any fields ---> Handle any fields which have same original value.</label><br>
+                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="sku_by_field"> Current SKU only + Exact fields ---> Handle modified fields which have same original value.</label><br>
+                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="sku_only"> Current SKU only + Any fields ---> Handle any fields which have same original value.</label><br>
                 <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="current"> Current item only</label>
               </div>
             </div>` : ''}

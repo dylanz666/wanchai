@@ -1316,31 +1316,31 @@ class WanchaiEditor:
                         clear_btn.place_forget()
             # Apply option
             apply_var = tk.StringVar(value="all_by_field")
-            option_frame = ttk.LabelFrame(dialog, text="Apply Change To", padding=10)
+            option_frame = ttk.LabelFrame(dialog, text="Apply Change To:", padding=10)
             option_frame.grid(
                 row=len(fields), column=0, columnspan=2, pady=(10, 0), sticky="we"
             )
             ttk.Radiobutton(
                 option_frame,
-                text="All SKUs + Exact field (only update fields whose value matches the original)",
+                text="All SKUs + Exact field ---> Handle modified fields which have same original value.",
                 variable=apply_var,
                 value="all_by_field",
             ).pack(anchor=tk.W)
             ttk.Radiobutton(
                 option_frame,
-                text="All SKUs + Any fields (replace any fields with same original value)",
+                text="All SKUs + Any fields ---> Handle any fields which have same original value.",
                 variable=apply_var,
                 value="all",
             ).pack(anchor=tk.W)
             ttk.Radiobutton(
                 option_frame,
-                text="Current SKU only + Exact fields (only update fields whose value matches the original)",
+                text="Current SKU only + Exact fields ---> Handle modified fields which have same original value.",
                 variable=apply_var,
                 value="sku_by_field",
             ).pack(anchor=tk.W)
             ttk.Radiobutton(
                 option_frame,
-                text="Current SKU only + Any fields (replace any fields with same original value)",
+                text="Current SKU only + Any fields ---> Handle any fields which have same original value.",
                 variable=apply_var,
                 value="sku_only",
             ).pack(anchor=tk.W)
