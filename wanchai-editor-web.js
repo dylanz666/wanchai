@@ -116,11 +116,17 @@ function customConfirm(message, onConfirm) {
 
 // Reload 二次确认
 function confirmReload(e) {
+  if(!iniFileName){
+    return
+  }
   const msg = 'Reload will overwrite all unsaved changes. This action cannot be undone.\nAre you sure you want to proceed?';
   customConfirm(msg, handleReload);
 }
 // Initialize 二次确认
 function confirmInitialize(e) {
+  if(!iniFileName){
+    return
+  }
   const msg = 'This will clear all loaded data and reset the application to its initial state.\nAre you sure you want to proceed?';
   // fixme
   customConfirm(msg, handleInit);
