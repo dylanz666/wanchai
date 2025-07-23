@@ -655,7 +655,9 @@ function showEditDialog(rowIndex, type = 'edit') {
       } else if (applyTo === 'all') {
         allRowsWithSku.forEach(item => {
           diffs.forEach(d => {
-            item.row[d.idx] = d.newVal;
+            for (let j = 1; j < columns.length; ++j) {
+              if (item.row[j] === d.oldVal) item.row[j] = d.newVal;
+            }
           });
         });
       } else if (applyTo === 'sku_by_field') {
@@ -670,7 +672,9 @@ function showEditDialog(rowIndex, type = 'edit') {
         allRowsWithSku.forEach(item => {
           if (item.sku === currentSku) {
             diffs.forEach(d => {
-              item.row[d.idx] = d.newVal;
+              for (let j = 1; j < columns.length; ++j) {
+                if (item.row[j] === d.oldVal) item.row[j] = d.newVal;
+              }
             });
           }
         });
