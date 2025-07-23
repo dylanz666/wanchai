@@ -21,9 +21,7 @@
             color: #222;
         }
 
-        .tree-table tr.selected {
-            background: #90caf9 !important;
-        }
+        .tree-table tbody tr.selected td, .tree-table tr.selected td { background: #d4f7d4 !important; }
 
         .overlay {
             position: absolute;
@@ -79,7 +77,9 @@
 
 <body>
     <div class="container-fluid py-3">
-        <h2 id="app-title">WanChai INI File Editor</h2>
+        <div style="text-align:center;">
+            <h2 id="app-title" style="display:inline-block;">WanChai INI File Editor</h2>
+        </div>
         <div class="mb-2 div-border">
             <label for="fileInput" class="form-label">INI File:</label>
             <input type="file" id="fileInput" accept=".ini" class="form-control d-inline-block" style="width:50%;">

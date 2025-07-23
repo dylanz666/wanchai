@@ -17,24 +17,85 @@ let selectedRowIndices = [];
 // 1. 绑定事件
 document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 document.getElementById('btnExport').addEventListener('click', handleExport);
-document.getElementById('btnReload').addEventListener('click', handleReload);
-document.getElementById('btnInit').addEventListener('click', handleInit);
+document.getElementById('btnReload').addEventListener('click', confirmReload);
+document.getElementById('btnInit').addEventListener('click', confirmInitialize);
 document.getElementById('skuSelect').addEventListener('change', e => { currentSku = e.target.value; renderTable(); });
 document.getElementById('btnAddSuffix').addEventListener('click', addSuffixToCurrentSku);
 document.getElementById('btnAddSuffixes').addEventListener('click', addSuffixToAllSkus);
 document.getElementById('btnBackspace').addEventListener('click', backspaceSkuSuffix);
 document.getElementById('btnPrevSku').addEventListener('click', gotoPrevSku);
 document.getElementById('btnNextSku').addEventListener('click', gotoNextSku);
-document.getElementById('btnClearSearch').addEventListener('click', () => { searchTerm = ""; document.getElementById('searchInput').value = ""; renderTable(); });
-document.getElementById('searchInput').addEventListener('input', e => { searchTerm = e.target.value.toLowerCase(); renderTable(); });
+document.getElementById('btnClearSearch').addEventListener('click', () => {
+  searchTerm = "";
+  document.getElementById('searchInput').value = "";
+  selectedRowIndices = [];
+  renderTable();
+});
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchTerm = e.target.value.toLowerCase();
+  selectedRowIndices = [];
+  renderTable();
+});
 document.getElementById('btnUpdateDate').addEventListener('click', updateExportDate);
+
+// 自定义 confirm 弹窗
+function customConfirm(message, onConfirm) {
+  // 移除已有弹窗
+  let old = document.getElementById('customConfirmModal');
+  if (old) old.remove();
+  // 创建弹窗
+  const modal = document.createElement('div');
+  modal.id = 'customConfirmModal';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100vw';
+  modal.style.height = '100vh';
+  modal.style.background = 'rgba(0,0,0,0.25)';
+  modal.style.zIndex = 99999;
+  modal.innerHTML = `
+    <div style="position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);background:#fff;padding:32px 32px 24px 32px;border-radius:10px;box-shadow:0 4px 24px #0002;min-width:340px;max-width:90vw;">
+      <div style="font-size:18px;font-weight:bold;margin-bottom:12px;">Confirm</div>
+      <div style="margin-bottom:24px;white-space:pre-line;">${message}</div>
+      <div style="text-align:right;">        
+        <button id="customConfirmOk" class="btn btn-primary">OK</button>
+        <button id="customConfirmCancel" class="btn btn-secondary me-2">Cancel</button>
+        <span id="customConfirmResult"></span>
+      </div>
+    </div>
+  `;
+  // style="display:none;"
+  document.body.appendChild(modal);
+  // 
+  document.getElementById('customConfirmCancel').onclick = function () {
+    modal.remove();
+  };
+  document.getElementById('customConfirmOk').onclick = function () {
+    modal.remove();
+    if (onConfirm) onConfirm();
+  };
+}
+
+// Reload 二次确认
+function confirmReload(e) {
+  const msg = 'Reload will overwrite all unsaved changes. This action cannot be undone.\nAre you sure you want to proceed?';
+  customConfirm(msg, handleReload);
+}
+// Initialize 二次确认
+function confirmInitialize(e) {
+  const msg = 'This will clear all loaded data and reset the application to its initial state.\nAre you sure you want to proceed?';
+  // fixme
+  customConfirm(msg, handleInit);
+}
 
 // 2. 解析INI文件
 function handleFileSelect(e) {
   const file = e.target.files[0];
-  if (!file) return;
+  if (!file) {
+    return;
+  }
   iniFileName = file.name;
-  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileName').textContent = iniFileName;
   const reader = new FileReader();
   reader.onload = function (evt) {
     iniContent = evt.target.result;
@@ -97,8 +158,10 @@ function renderTable() {
   if (searchTerm) {
     rows = rows.filter(item => item.row.some(v => String(v).toLowerCase().includes(searchTerm)));
   }
-  rows.forEach(item => {
+  rows.forEach((item, idx) => {
     const tr = document.createElement('tr');
+    tr.setAttribute('data-row-index', idx);
+    if (selectedRowIndices.includes(idx)) tr.classList.add('selected');
     item.row.forEach((v, i) => {
       const td = document.createElement('td');
       td.textContent = v;
@@ -107,6 +170,15 @@ function renderTable() {
     tbody.appendChild(tr);
   });
   document.getElementById('skuCount').textContent = rows.length + " items";
+  // 单选高亮：点击某行只高亮该行
+  tbody.onclick = function (e) {
+    let tr = e.target;
+    while (tr && tr.tagName !== 'TR') tr = tr.parentElement;
+    if (!tr) return;
+    let idx = Number(tr.getAttribute('data-row-index'));
+    selectedRowIndices = [idx];
+    renderTable();
+  };
 }
 
 // 6. 渲染Info
@@ -188,13 +260,34 @@ function handleExport() {
   const blob = new Blob([content], { type: 'text/plain' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = iniFileName.replace(/\.ini$/, '') + '_export.ini';
+  a.download = iniFileName.replace(/\[[^\]]*\]/g, '[]').replace(/\.ini$/, '') + '.ini';
   a.click();
 }
 
 // 10. 其它事件处理（重载、初始化、日期更新等）
-function handleReload() { if (iniContent) parseIniContent(iniContent); renderSkuSelect(); renderTable(); renderInfo(); }
-function handleInit() { iniFileName = ""; iniContent = ""; infoSection = { UnitCount: "", ExportDate: "" }; skuList = []; allRowsWithSku = []; currentSku = ""; renderSkuSelect(); renderTable(); renderInfo(); }
+function handleReload() {
+  if (iniContent) parseIniContent(iniContent);
+  selectedRowIndices = [];
+  renderSkuSelect();
+  renderTable();
+  renderInfo();
+}
+function handleInit() {
+  iniFileName = "";
+  iniContent = "";
+  infoSection = { UnitCount: "", ExportDate: "" }; skuList = []; allRowsWithSku = []; currentSku = "";
+  selectedRowIndices = [];
+  renderSkuSelect();
+  renderTable();
+  renderInfo();
+  // 恢复 fileInput,searchInput,skuSuffix 为初始状态
+  const fileInput = document.getElementById('fileInput');
+  if (fileInput) fileInput.value = '';
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.value = '';
+  const skuSuffix = document.getElementById('skuSuffix');
+  if (skuSuffix) skuSuffix.value = '_GRC';
+}
 function updateExportDate() {
   const now = new Date();
   const dateStr = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()} ${now.toLocaleTimeString('en-US')}`;
@@ -256,14 +349,51 @@ function addSuffixToAllSkus() {
   document.getElementById('skuSelect').value = currentSku;
   renderTable();
 }
-function backspaceSkuSuffix() { /* 预留：实现SKU后缀回退 */ }
+function backspaceSkuSuffix() {
+  const sku = document.getElementById('skuSelect').value;
+  if (!sku || sku.length <= 1) return;
+  const newSku = sku.slice(0, -1);
+  if (skuList.includes(newSku)) {
+    alert('Target SKU name is duplicated with another SKU, please check.');
+    return;
+  }
+  // 更新 skuList
+  const idx = skuList.indexOf(sku);
+  if (idx !== -1) skuList[idx] = newSku;
+  // 更新所有 test item 的 Identifier 字段
+  allRowsWithSku.forEach(item => {
+    if (item.sku === sku) {
+      item.sku = newSku;
+      if (item.row[1] === sku) item.row[1] = newSku;
+    }
+  });
+  // 刷新下拉框、选中、表格
+  renderSkuSelect();
+  document.getElementById('skuSelect').value = newSku;
+  currentSku = newSku;
+  renderTable();
+}
 function gotoPrevSku() {
   const idx = skuList.indexOf(currentSku);
-  if (idx > 0) { currentSku = skuList[idx - 1]; document.getElementById('skuSelect').value = currentSku; renderTable(); }
+  if (idx > 0) {
+    currentSku = skuList[idx - 1];
+    document.getElementById('skuSelect').value = currentSku;
+    selectedRowIndices = [];
+    renderTable();
+  } else {
+    showAutoDismissMessage('This is the first SKU!');
+  }
 }
 function gotoNextSku() {
   const idx = skuList.indexOf(currentSku);
-  if (idx >= 0 && idx < skuList.length - 1) { currentSku = skuList[idx + 1]; document.getElementById('skuSelect').value = currentSku; renderTable(); }
+  if (idx >= 0 && idx < skuList.length - 1) {
+    currentSku = skuList[idx + 1];
+    document.getElementById('skuSelect').value = currentSku;
+    selectedRowIndices = [];
+    renderTable();
+  } else {
+    showAutoDismissMessage('This is the last SKU!');
+  }
 }
 
 // 12. 编辑弹窗、右键菜单、拖拽排序、剪贴板等
@@ -336,14 +466,17 @@ function enableContextMenu() {
     menu.style.display = 'none';
     menu.style.position = 'absolute';
     menu.style.zIndex = 9999;
-    menu.innerHTML = `
-      <li data-action="edit">Edit</li>
-      <li data-action="batch-edit">批量编辑</li>
-      <li data-action="copy">Copy</li>
-      <li data-action="delete">Delete</li>
-    `;
     document.body.appendChild(menu);
   }
+  menu.innerHTML = `
+    <li data-action="edit">Edit</li>
+    <li data-action="insert-before">Insert Before</li>
+    <li data-action="insert-after">Insert After</li>
+    <li data-action="copy">Copy</li>
+    <li data-action="copy-to-all">Copy To Other SKUs</li>
+    <li data-action="delete">Delete</li>
+  `;
+
   table.addEventListener('contextmenu', function (e) {
     e.preventDefault();
     let tr = e.target;
@@ -358,16 +491,21 @@ function enableContextMenu() {
     menu.style.left = e.pageX + 'px';
     menu.style.top = e.pageY + 'px';
   });
+
   document.addEventListener('click', () => { menu.style.display = 'none'; });
+
   menu.addEventListener('click', function (e) {
     const action = e.target.getAttribute('data-action');
     if (action === 'edit') {
       if (selectedRowIndices.length === 1) showEditDialog(selectedRowIndices[0]);
-    } else if (action === 'batch-edit') {
-      if (selectedRowIndices.length > 1) showBatchEditDialog(selectedRowIndices);
+    } else if (action === 'insert-before') {
+      if (selectedRowIndices.length === 1) insertTestItem(selectedRowIndices[0], true);
+    } else if (action === 'insert-after') {
+      if (selectedRowIndices.length === 1) insertTestItem(selectedRowIndices[0], false);
     } else if (action === 'copy') {
-      // 可实现复制到剪贴板
       copySelectedRowsToClipboard();
+    } else if (action === 'copy-to-all') {
+      copyToAllSkus(selectedRowIndices);
     } else if (action === 'delete') {
       deleteSelectedRows();
     }
@@ -375,8 +513,60 @@ function enableContextMenu() {
   });
 }
 
+// 插入新 test item
+function insertTestItem(rowIndex, before = true) {
+  let rows = allRowsWithSku.filter(item => item.sku === currentSku);
+  let insertAt = before ? rowIndex : rowIndex + 1;
+  // 构造空行
+  let newRow = [
+    (insertAt + 1).toString(), // Index
+    currentSku, '', '', '', '', '', '', '', '', ''
+  ];
+  // 插入到 allRowsWithSku
+  let globalIdx = 0, count = 0;
+  for (let i = 0; i < allRowsWithSku.length; ++i) {
+    if (allRowsWithSku[i].sku === currentSku) {
+      if (count === insertAt) { globalIdx = i; break; }
+      count++;
+    }
+  }
+  allRowsWithSku.splice(globalIdx, 0, { row: newRow.slice(), sku: currentSku });
+  // 重新编号
+  let skuRows = allRowsWithSku.filter(item => item.sku === currentSku);
+  skuRows.forEach((item, idx) => { item.row[0] = (idx + 1).toString(); });
+  renderTable();
+  // 弹出编辑
+  let idxInSku = insertAt;
+  showEditDialog(idxInSku, before ? 'insert-before' : 'insert-after');
+}
+
+// 复制到所有 SKU
+function copyToAllSkus(rowIndices) {
+  let rows = allRowsWithSku.filter(item => item.sku === currentSku);
+  let selectedRows = rowIndices.map(idx => rows[idx]);
+  let otherSkus = skuList.filter(sku => sku !== currentSku);
+  otherSkus.forEach(sku => {
+    let skuRows = allRowsWithSku.filter(item => item.sku === sku);
+    rowIndices.forEach((selIdx, offset) => {
+      // 插入到相同 index 下方
+      let insertAt = selIdx + 1;
+      // 找到 allRowsWithSku 中对应的全局插入点
+      let skuIndices = allRowsWithSku.map((item, i) => item.sku === sku ? i : -1).filter(i => i !== -1);
+      let globalInsertAt = skuIndices[insertAt] !== undefined ? skuIndices[insertAt] : allRowsWithSku.length;
+      let sel = selectedRows[offset];
+      let newRow = ["TMP", sku, ...sel.row.slice(2)];
+      allRowsWithSku.splice(globalInsertAt, 0, { row: newRow, sku });
+    });
+    // 重新编号该 SKU 下所有行的 Index
+    let newSkuRows = allRowsWithSku.filter(item => item.sku === sku);
+    newSkuRows.forEach((item, idx) => { item.row[0] = (idx + 1).toString(); });
+  });
+  renderTable();
+  showAutoDismissMessage('Copied to other SKUs!');
+}
+
 // 编辑弹窗
-function showEditDialog(rowIndex) {
+function showEditDialog(rowIndex, type = 'edit') {
   let rows = allRowsWithSku.filter(item => item.sku === currentSku);
   if (rowIndex < 0 || rowIndex >= rows.length) return;
   let rowObj = rows[rowIndex];
@@ -384,33 +574,46 @@ function showEditDialog(rowIndex) {
   let dialog = document.createElement('div');
   dialog.className = 'modal fade';
   dialog.tabIndex = -1;
+  let title = 'Edit Test Item';
+  if (type === 'insert-before') title = 'Insert Test Item (Before)';
+  if (type === 'insert-after') title = 'Insert Test Item (After)';
   dialog.innerHTML = `
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Edit Test Item</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-md" style="max-width:600px;">
+      <div class="modal-content" style="font-size:14px;">
+        <div class="modal-header" style="padding:8px 14px;">
+          <h5 class="modal-title" style="font-size:16px;">${title}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" style="width:20px;height:20px;"></button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body" style="padding:10px 14px;">
           <form id="editTestItemForm">
             ${testColumns.map((col, i) => `
-              <div class="mb-3 row">
-                <label class="col-sm-3 col-form-label">${col}:</label>
-                <div class="col-sm-9">
+              <div class="mb-1 row" style="margin-bottom:4px !important;">
+                <label class="col-sm-4 col-form-label" style="font-size:13px;padding-right:4px;">${col}:</label>
+                <div class="col-sm-8">
                   ${col === 'Index'
-      ? `<input type="text" class="form-control" name="${col}" value="${row[i] || ''}" readonly>`
-      : col === 'Parameters'
-        ? `<textarea class="form-control" name="${col}" rows="3">${row[i] || ''}</textarea>`
-        : `<input type="text" class="form-control" name="${col}" value="${row[i] || ''}">`
-    }
+                    ? `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" readonly>`
+                    : col === 'Parameters'
+                      ? `<textarea class="form-control form-control-sm" name="${col}" rows="2" style="font-size:12px;">${row[i] || ''}</textarea>`
+                      : `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" style="font-size:12px;">`
+                  }
                 </div>
               </div>
             `).join('')}
+            ${(type === 'edit') ? `<div class="mb-1" id="applyChangeToOptions" style="margin-bottom:6px !important;">
+              <div style="font-weight:bold;font-size:12px;margin-bottom:2px;">Apply Change To</div>
+              <div>
+                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="all_by_field" checked> All SKUs + Exact field</label><br>
+                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="all"> All SKUs + Any fields</label><br>
+                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="sku_by_field"> Current SKU only + Exact fields</label><br>
+                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="sku_only"> Current SKU only + Any fields</label><br>
+                <label style="margin-bottom:2px;"><input type="radio" name="applyTo" value="current"> Current item only</label>
+              </div>
+            </div>` : ''}
           </form>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-primary" id="editTestItemSaveBtn">Save</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <div class="modal-footer" style="padding:8px 14px;">
+          <button type="button" class="btn btn-primary btn-sm" id="editTestItemSaveBtn">Save</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         </div>
       </div>
     </div>
@@ -421,16 +624,64 @@ function showEditDialog(rowIndex) {
   dialog.querySelector('#editTestItemSaveBtn').onclick = function () {
     let form = dialog.querySelector('#editTestItemForm');
     let newRow = testColumns.map(col => form.elements[col].value);
-    let err = validateTestItem(newRow);
-    if (err) {
-      alert(err);
-      return;
-    }
-    let globalIdx = allRowsWithSku.findIndex(item =>
-      item.sku === currentSku && item.row[0] === row[0]
-    );
-    if (globalIdx !== -1) {
-      allRowsWithSku[globalIdx].row = newRow;
+    if (type !== 'edit') {
+      // 只改当前行
+      let globalIdx = allRowsWithSku.findIndex(item =>
+        item.sku === currentSku && item.row[0] === row[0]
+      );
+      if (globalIdx !== -1) {
+        allRowsWithSku[globalIdx].row = newRow;
+      }
+    } else {
+      let applyTo = dialog.querySelector('input[name="applyTo"]:checked').value;
+      let oldRow = row.slice();
+      let columns = testColumns;
+      function getFieldDiffs(oldRow, newRow) {
+        let diffs = [];
+        for (let i = 1; i < columns.length; ++i) {
+          if ((oldRow[i] ?? '') !== (newRow[i] ?? '')) {
+            diffs.push({ col: columns[i], oldVal: oldRow[i], newVal: newRow[i], idx: i });
+          }
+        }
+        return diffs;
+      }
+      let diffs = getFieldDiffs(oldRow, newRow);
+      if (applyTo === 'all_by_field') {
+        allRowsWithSku.forEach(item => {
+          diffs.forEach(d => {
+            if (item.row[d.idx] === d.oldVal) item.row[d.idx] = d.newVal;
+          });
+        });
+      } else if (applyTo === 'all') {
+        allRowsWithSku.forEach(item => {
+          diffs.forEach(d => {
+            item.row[d.idx] = d.newVal;
+          });
+        });
+      } else if (applyTo === 'sku_by_field') {
+        allRowsWithSku.forEach(item => {
+          if (item.sku === currentSku) {
+            diffs.forEach(d => {
+              if (item.row[d.idx] === d.oldVal) item.row[d.idx] = d.newVal;
+            });
+          }
+        });
+      } else if (applyTo === 'sku_only') {
+        allRowsWithSku.forEach(item => {
+          if (item.sku === currentSku) {
+            diffs.forEach(d => {
+              item.row[d.idx] = d.newVal;
+            });
+          }
+        });
+      } else if (applyTo === 'current') {
+        let globalIdx = allRowsWithSku.findIndex(item =>
+          item.sku === currentSku && item.row[0] === row[0]
+        );
+        if (globalIdx !== -1) {
+          allRowsWithSku[globalIdx].row = newRow;
+        }
+      }
     }
     renderTable();
     modal.hide();
@@ -539,11 +790,35 @@ function showAutoDismissMessage(text) {
 // 复制
 function copySelectedRowsToClipboard() {
   let rows = allRowsWithSku.filter(item => item.sku === currentSku);
-  let lines = selectedRowIndices.map(idx => rows[idx]?.row?.join('\t')).filter(Boolean);
-  if (lines.length) {
-    navigator.clipboard.writeText(lines.join('\n'));    
-    showAutoDismissMessage('Copied to clipboard');
-  }
+  let selectedRows = selectedRowIndices.map(idx => rows[idx]).filter(Boolean);
+  if (!selectedRows.length) return;
+  // 1. 复制到剪贴板（导出格式）
+  const header = "(Identifier,TestID,Description,Enabled,StringLimit,LowLimit,HighLimit,LimitType,Unit,Parameters)";
+  let lines = selectedRows.map(item => {
+    let exportRow = item.row.slice(1);
+    let formatted = exportRow.map((v, i) => (i === 2 && (v === "0" || v === "1")) ? v : `'${v}'`).join(",");
+    return `${item.row[0]}=${header} VALUES (${formatted})`;
+  });
+  navigator.clipboard.writeText(lines.join('\n'));
+  // 2. 粘贴到选中行的最后一行的下一个位置
+  let skuRows = allRowsWithSku.filter(item => item.sku === currentSku);
+  // 找到选中区块的最大 index
+  let maxIdx = Math.max(...selectedRowIndices.map(idx => Number(skuRows[idx]?.row[0] || 0)), 0);
+  // 插入点应为最大 index + 1
+  let insertAt = maxIdx;
+  // 找到 allRowsWithSku 中对应的全局插入点
+  let skuIndices = allRowsWithSku.map((item, i) => item.sku === currentSku ? i : -1).filter(i => i !== -1);
+  let globalInsertAt = skuIndices[insertAt] !== undefined ? skuIndices[insertAt] : allRowsWithSku.length;
+  selectedRows.forEach(item => {
+    let newRow = ["TMP", ...item.row.slice(1)];
+    allRowsWithSku.splice(globalInsertAt, 0, { row: newRow, sku: currentSku });
+    globalInsertAt++;
+  });
+  // 3. 重新编号当前 SKU 下所有行的 Index，保证连续
+  let newSkuRows = allRowsWithSku.filter(item => item.sku === currentSku);
+  newSkuRows.forEach((item, idx) => { item.row[0] = (idx + 1).toString(); });
+  renderTable();
+  showAutoDismissMessage('Copied and pasted!');
 }
 // 删除
 function deleteSelectedRows() {
@@ -551,6 +826,9 @@ function deleteSelectedRows() {
   let indices = selectedRowIndices.map(idx => rows[idx]?.row[0]);
   allRowsWithSku = allRowsWithSku.filter(item => !(item.sku === currentSku && indices.includes(item.row[0])));
   selectedRowIndices = [];
+  // 重新编号当前 SKU 下所有行的 Index，保证连续
+  let newSkuRows = allRowsWithSku.filter(item => item.sku === currentSku);
+  newSkuRows.forEach((item, idx) => { item.row[0] = (idx + 1).toString(); });
   renderTable();
 }
 
@@ -563,4 +841,4 @@ if (document.readyState === 'loading') {
 } else {
   enableRowEditAndHighlight();
   enableContextMenu();
-} 
+}
