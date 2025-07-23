@@ -90,6 +90,9 @@ python package.py patch
 python package.py minor
 python package.py major
 
+# for web version use
+python package-web.py
+
 # basic usage
 pyinstaller --clean --onefile --windowed wanchai-editor.py
 pyinstaller --clean --onefile --windowed --name wanchai-editor_v1.0.0-beta.1 wanchai-editor.py
