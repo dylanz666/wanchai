@@ -40,7 +40,10 @@ wanchai-tool/
 ├── editor.ico                       # Program icon
 ├── version_manager.py               # Version management tool
 ├── version.py                       # Version number storage file
-└── package.py                       # Packaging script
+├── index.html                       # Web version html file
+├── wanchai-editor-web.js            # Core js for index.html
+├── package.py                       # Packaging script
+└── package-web.py                   # Web version packaging script
 ```
 
 ## System Requirements
