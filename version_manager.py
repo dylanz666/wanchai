@@ -50,7 +50,7 @@ def main():
         return
 
     cmd = args[0].lower()
-    if cmd in ("major", "minor", "patch", "release", "prerelease"):
+    if cmd in ("major", "minor", "patch", "prerelease"):
         old_version = read_version()
         if cmd == "patch" and "-" in old_version:
             new_version = old_version.split("-")[0]
@@ -62,7 +62,8 @@ def main():
             new_version = bump_version(old_version, cmd)
         write_version(new_version)
         print(f"Version bumped: {old_version} -> {new_version}")
-    elif cmd == "set" and len(args) == 2:
+        return
+    if cmd == "set" and len(args) == 2:
         new_version = args[1]
         try:
             semver.VersionInfo.parse(new_version)
@@ -70,10 +71,12 @@ def main():
             print(f"Version set to: {new_version}")
         except ValueError:
             print(f"Invalid semver: {new_version}")
-    elif cmd == "get":
-        print(read_version())
-    else:
-        print(f"Invalid command.\n{usage}")
+        return
+    if cmd == "get":
+        version = read_version()
+        print(version)
+        return version
+    print(f"Invalid command.\n{usage}")
 
 
 if __name__ == "__main__":
