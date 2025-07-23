@@ -11,9 +11,17 @@
             background: #f5f6fa;
         }
 
-        .tree-table th,
-        .tree-table td {
+        .tree-table {
+            border-collapse: collapse;
+            min-width: 100%;
+            width: max-content;
+            table-layout: auto;
+        }
+        .tree-table th, .tree-table td {
+            border: 1px solid #dee2e6;
+            padding: 4px 8px;
             font-size: 14px;
+            background: #fff;
         }
 
         .tree-table th {
@@ -72,6 +80,12 @@
         .div-border:last-child {
             margin-bottom: 0;
         }
+        .tree-table td, .tree-table th {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+        }
     </style>
 </head>
 
@@ -82,7 +96,7 @@
         </div>
         <div class="mb-2 div-border">
             <label for="fileInput" class="form-label">INI File:</label>
-            <input type="file" id="fileInput" accept=".ini" class="form-control d-inline-block" style="width:50%;">
+            <input type="file" id="fileInput" accept=".ini" class="form-control d-inline-block" style="width:76%;">
             <button class="btn btn-success ms-2" id="btnExport">Export</button>
             <button class="btn btn-danger ms-2" id="btnReload">Reload</button>
             <button class="btn btn-danger ms-2" id="btnInit">Initialize</button>
@@ -131,7 +145,8 @@
                 <div class="tab-pane fade show active" id="tests" role="tabpanel">
 
                     <div class="position-relative mt-3" style="min-height:400px;">
-                        <table class="table table-bordered tree-table" id="testTable">
+                        <div style="overflow-x:auto;">
+                        <table class="tree-table" id="testTable">
                             <thead>
                                 <tr>
                                     <th>Index</th>
@@ -149,6 +164,7 @@
                             </thead>
                             <tbody></tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
                 <!-- Info Tab -->

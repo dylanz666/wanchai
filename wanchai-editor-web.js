@@ -152,12 +152,17 @@ function renderSkuSelect() {
 
 // 5. 渲染表格
 function renderTable() {
-  const tbody = document.getElementById('testTable').querySelector('tbody');
+  const table = document.getElementById('testTable');
+  const tbody = table.querySelector('tbody');
   tbody.innerHTML = '';
+  // 兼容搜索过滤，rows为当前可见行
   let rows = allRowsWithSku.filter(item => item.sku === currentSku);
   if (searchTerm) {
     rows = rows.filter(item => item.row.some(v => String(v).toLowerCase().includes(searchTerm)));
   }
+  // 设置 th/td 宽度为 auto
+  const ths = table.querySelectorAll('th');
+  ths.forEach(th => th.style.width = 'auto');
   rows.forEach((item, idx) => {
     const tr = document.createElement('tr');
     tr.setAttribute('data-row-index', idx);
@@ -165,20 +170,13 @@ function renderTable() {
     item.row.forEach((v, i) => {
       const td = document.createElement('td');
       td.textContent = v;
+      td.style.width = 'auto';
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
   });
   document.getElementById('skuCount').textContent = rows.length + " items";
-  // 单选高亮：点击某行只高亮该行
-  tbody.onclick = function (e) {
-    let tr = e.target;
-    while (tr && tr.tagName !== 'TR') tr = tr.parentElement;
-    if (!tr) return;
-    let idx = Number(tr.getAttribute('data-row-index'));
-    selectedRowIndices = [idx];
-    renderTable();
-  };
+  enableResizableTable();
 }
 
 // 6. 渲染Info
@@ -402,12 +400,17 @@ function gotoNextSku() {
 // 扩展 renderTable 支持多选高亮
 const _orig_renderTable = renderTable;
 renderTable = function () {
-  const tbody = document.getElementById('testTable').querySelector('tbody');
+  const table = document.getElementById('testTable');
+  const tbody = table.querySelector('tbody');
   tbody.innerHTML = '';
+  // 兼容搜索过滤，rows为当前可见行
   let rows = allRowsWithSku.filter(item => item.sku === currentSku);
   if (searchTerm) {
     rows = rows.filter(item => item.row.some(v => String(v).toLowerCase().includes(searchTerm)));
   }
+  // 设置 th/td 宽度为 auto
+  const ths = table.querySelectorAll('th');
+  ths.forEach(th => th.style.width = 'auto');
   rows.forEach((item, idx) => {
     const tr = document.createElement('tr');
     tr.setAttribute('data-row-index', idx);
@@ -415,6 +418,7 @@ renderTable = function () {
     item.row.forEach((v, i) => {
       const td = document.createElement('td');
       td.textContent = v;
+      td.style.width = 'auto';
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -448,10 +452,108 @@ function enableRowEditAndHighlight() {
     } else {
       // 单选
       selectedRowIndices = [rowIndex];
-      renderTable();
-      return;
     }
-    renderTable();
+    // 只更新高亮，不刷新表格
+    const tbody = table.querySelector('tbody');
+    Array.from(tbody.children).forEach((row, i) => {
+      if (selectedRowIndices.includes(i)) row.classList.add('selected');
+      else row.classList.remove('selected');
+    });
+  });
+  // 新增：双击行打开编辑窗口
+  table.addEventListener('dblclick', function (e) {
+    let tr = e.target;
+    while (tr && tr.tagName !== 'TR') tr = tr.parentElement;
+    if (!tr) return;
+    if (tr.parentElement.tagName !== 'TBODY') return;
+    let rowIndex = Number(tr.getAttribute('data-row-index'));
+    showEditDialog(rowIndex, 'edit');
+  });
+  // 新增：Ctrl+C/Ctrl+V/Ctrl+X 复制、粘贴、剪切（全局监听，表格聚焦或页面内都可用）
+  document.addEventListener('keydown', async function (e) {
+    // 仅在主表格tab激活时生效
+    const table = document.getElementById('testTable');
+    const isTableTab = document.getElementById('tests').classList.contains('active');
+    if (!isTableTab) return;
+    // 兼容搜索过滤，rows为当前可见行
+    let rows = allRowsWithSku.filter(item => item.sku === currentSku);
+    if (searchTerm) {
+      rows = rows.filter(item => item.row.some(v => String(v).toLowerCase().includes(searchTerm)));
+    }
+    // 复制
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+      let selectedRows = selectedRowIndices.map(idx => rows[idx]).filter(Boolean);
+      if (!selectedRows.length) return;
+      // 导出格式
+      const header = "(Identifier,TestID,Description,Enabled,StringLimit,LowLimit,HighLimit,LimitType,Unit,Parameters)";
+      let lines = selectedRows.map(item => {
+        let exportRow = item.row.slice(1);
+        let formatted = exportRow.map((v, i) => (i === 2 && (v === "0" || v === "1")) ? v : `'${v}'`).join(",");
+        return `${item.row[0]}=${header} VALUES (${formatted})`;
+      });
+      try { await navigator.clipboard.writeText(lines.join('\n')); showAutoDismissMessage(selectedRows.length == 1 ? 'Item is copied!' : 'Items are copied!'); } catch { }
+      e.preventDefault();
+    }
+    // 粘贴
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+      try {
+        let text = await navigator.clipboard.readText();
+        // 支持 INI 导出格式
+        let pastedRows = [];
+        text.split(/\r?\n/).forEach(line => {
+          let m = line.match(/^\s*(\d+)\s*=\s*\(Identifier,TestID,Description,Enabled,StringLimit,LowLimit,HighLimit,LimitType,Unit,Parameters\)\s*VALUES\s*\((.*)\)\s*$/);
+          if (m) {
+            let idx = m[1];
+            let values = parseRowValues(m[2]);
+            pastedRows.push([idx, ...values]);
+          }
+        });
+        if (!pastedRows.length) return;
+        // 粘贴到当前可见区块最后一行的下一个位置
+        let maxIdx = Math.max(...selectedRowIndices, -1);
+        let insertAt = maxIdx + 1;
+        // 找到 allRowsWithSku 中对应的全局插入点
+        let visibleRows = allRowsWithSku
+          .map((item, i) => ({ item, i }))
+          .filter(({ item }) => item.sku === currentSku && (!searchTerm || item.row.some(v => String(v).toLowerCase().includes(searchTerm))));
+        let globalInsertAt = visibleRows[insertAt]?.i ?? allRowsWithSku.length;
+        pastedRows.forEach(row => {
+          let newRow = ["TMP", ...row.slice(1)];
+          allRowsWithSku.splice(globalInsertAt, 0, { row: newRow, sku: currentSku });
+          globalInsertAt++;
+        });
+        // 重新编号当前 SKU 下所有行的 Index
+        let newSkuRows = allRowsWithSku.filter(item => item.sku === currentSku);
+        newSkuRows.forEach((item, idx) => { item.row[0] = (idx + 1).toString(); });
+        renderTable();
+        showAutoDismissMessage(pastedRows.length == 1 ? 'Item is pasted!' : 'Items are pasted!');
+      } catch { }
+      e.preventDefault();
+    }
+    // 剪切
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+      let selectedRows = selectedRowIndices.map(idx => rows[idx]).filter(Boolean);
+      if (!selectedRows.length) return;
+      // 导出格式
+      const header = "(Identifier,TestID,Description,Enabled,StringLimit,LowLimit,HighLimit,LimitType,Unit,Parameters)";
+      let lines = selectedRows.map(item => {
+        let exportRow = item.row.slice(1);
+        let formatted = exportRow.map((v, i) => (i === 2 && (v === "0" || v === "1")) ? v : `'${v}'`).join(",");
+        return `${item.row[0]}=${header} VALUES (${formatted})`;
+      });
+      try { await navigator.clipboard.writeText(lines.join('\n')); showAutoDismissMessage(selectedRows.length == 1 ? 'Item is cut!' : 'Items are cut!'); } catch { }
+      // 删除选中行
+      let indices = selectedRowIndices.map(idx => rows[idx]?.row[0]);
+      // 只删除当前可见（过滤后）rows中选中的行
+      let toDelete = new Set(indices);
+      allRowsWithSku = allRowsWithSku.filter(item => !(item.sku === currentSku && toDelete.has(item.row[0]) && (!searchTerm || item.row.some(v => String(v).toLowerCase().includes(searchTerm)))));
+      // 重新编号当前 SKU 下所有行的 Index
+      let newSkuRows = allRowsWithSku.filter(item => item.sku === currentSku);
+      newSkuRows.forEach((item, idx) => { item.row[0] = (idx + 1).toString(); });
+      selectedRowIndices = [];
+      renderTable();
+      e.preventDefault();
+    }
   });
 }
 
@@ -591,11 +693,11 @@ function showEditDialog(rowIndex, type = 'edit') {
                 <label class="col-sm-4 col-form-label" style="font-size:13px;padding-right:4px;">${col}:</label>
                 <div class="col-sm-8">
                   ${col === 'Index'
-                    ? `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" readonly>`
-                    : col === 'Parameters'
-                      ? `<textarea class="form-control form-control-sm" name="${col}" rows="2" style="font-size:12px;">${row[i] || ''}</textarea>`
-                      : `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" style="font-size:12px;">`
-                  }
+      ? `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" readonly>`
+      : col === 'Parameters'
+        ? `<textarea class="form-control form-control-sm" name="${col}" rows="2" style="font-size:12px;">${row[i] || ''}</textarea>`
+        : `<input type="text" class="form-control form-control-sm" name="${col}" value="${row[i] || ''}" style="font-size:12px;">`
+    }
                 </div>
               </div>
             `).join('')}
@@ -828,7 +930,9 @@ function copySelectedRowsToClipboard() {
 function deleteSelectedRows() {
   let rows = allRowsWithSku.filter(item => item.sku === currentSku);
   let indices = selectedRowIndices.map(idx => rows[idx]?.row[0]);
-  allRowsWithSku = allRowsWithSku.filter(item => !(item.sku === currentSku && indices.includes(item.row[0])));
+  // 只删除当前可见（过滤后）rows中选中的行
+  let toDelete = new Set(indices);
+  allRowsWithSku = allRowsWithSku.filter(item => !(item.sku === currentSku && toDelete.has(item.row[0]) && (!searchTerm || item.row.some(v => String(v).toLowerCase().includes(searchTerm)))));
   selectedRowIndices = [];
   // 重新编号当前 SKU 下所有行的 Index，保证连续
   let newSkuRows = allRowsWithSku.filter(item => item.sku === currentSku);
@@ -845,4 +949,73 @@ if (document.readyState === 'loading') {
 } else {
   enableRowEditAndHighlight();
   enableContextMenu();
+}
+
+function enableResizableTable() {
+  const table = document.getElementById('testTable');
+  if (!table) return;
+  const ths = table.querySelectorAll('th');
+  let colWidths = JSON.parse(localStorage.getItem('wanchai_col_widths') || '[]');
+  ths.forEach((th, i) => {
+    if (colWidths[i]) th.style.width = colWidths[i];
+  });
+  ths.forEach((th, i) => {
+    if (th.querySelector('.col-resize-handle')) return;
+    const handle = document.createElement('div');
+    handle.className = 'col-resize-handle';
+    handle.style.background = '#e6eaf2';
+    handle.style.width = '12px';
+    handle.style.right = '-6px';
+    handle.style.borderRadius = '6px';
+    handle.style.opacity = '0.7';
+    th.appendChild(handle);
+    let startX, startWidth;
+    handle.onmousedown = function (e) {
+      startX = e.pageX;
+      startWidth = th.offsetWidth;
+      document.body.style.cursor = 'col-resize';
+      document.onmousemove = function (e2) {
+        let newWidth = startWidth + (e2.pageX - startX);
+        if (newWidth > 30) {
+          th.style.width = newWidth + 'px';
+          // 设置所有 td
+          table.querySelectorAll('tr').forEach(row => {
+            let cell = row.children[i];
+            if (cell) cell.style.width = newWidth + 'px';
+          });
+        }
+      };
+      document.onmouseup = function () {
+        document.body.style.cursor = '';
+        document.onmousemove = null;
+        document.onmouseup = null;
+        // 记忆列宽
+        let ths2 = table.querySelectorAll('th');
+        let widths = Array.from(ths2).map(th => th.style.width || '');
+        localStorage.setItem('wanchai_col_widths', JSON.stringify(widths));
+      };
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    // 双击自适应内容宽度
+    handle.ondblclick = function (e) {
+      // 仅在拖动柄上双击才自适应宽度
+      let max = th.scrollWidth;
+      table.querySelectorAll('tr').forEach(row => {
+        let cell = row.children[i];
+        if (cell) max = Math.max(max, cell.scrollWidth);
+      });
+      th.style.width = (max + 16) + 'px';
+      table.querySelectorAll('tr').forEach(row => {
+        let cell = row.children[i];
+        if (cell) cell.style.width = (max + 16) + 'px';
+      });
+      // 记忆列宽
+      let ths2 = table.querySelectorAll('th');
+      let widths = Array.from(ths2).map(th => th.style.width || '');
+      localStorage.setItem('wanchai_col_widths', JSON.stringify(widths));
+      e.preventDefault();
+      e.stopPropagation();
+    };
+  });
 }

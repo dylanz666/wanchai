@@ -1,0 +1,16 @@
+# WanChai INI Editor Requirements
+# 所有依赖都是Python标准库，无需额外安装
+
+# 主要使用的标准库模块：
+# - tkinter (GUI框架)
+# - configparser (INI文件解析)
+# - os (文件系统操作)
+# - datetime (日期时间处理)
+# - re (正则表达式)
+
+# 主类名: WanchaiEditor
+# 启动文件: wanchai-editor.py
+# 如果需要在其他环境中运行，确保Python版本 >= 3.6 
+tkinterdnd2==0.4.3
+pyinstaller==6.14.2
+semver==3.0.4
