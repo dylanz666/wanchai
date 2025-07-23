@@ -27,47 +27,53 @@ def write_version(version):
 
 def bump_version(version, bump_type):
     v = semver.VersionInfo.parse(version)
-    if bump_type == "major":
-        return str(v.bump_major())
-    elif bump_type == "minor":
-        return str(v.bump_minor())
-    elif bump_type == "prerelease":
-        return str(v.bump_prerelease())
-    else:
-        return str(v.bump_patch())
+    if bump_type == "patch" and "-" in version:
+        return version.split("-")[0]
+    bump_methods = {
+        "major": v.bump_major,
+        "minor": v.bump_minor,
+        "patch": v.bump_patch,
+        "prerelease": v.bump_prerelease,
+    }
+    method = bump_methods.get(bump_type)
+    if method is None:
+        # 默认 patch
+        method = v.bump_patch
+    return str(method())
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(f"Current version: {read_version()}")
-        print(
-            "Usage: python version_manager.py [patch|minor|major|prerelease|set <version>|get]"
-        )
+    usage = "Usage: python version_manager.py [patch|minor|major|prerelease|set <version>|get]"
+    args = sys.argv[1:]
+    if not args:
+        print(f"Current version: {read_version()}\n{usage}")
         return
-    cmd = sys.argv[1].lower()
-    if cmd in ("major", "minor", "patch", "prerelease"):
+
+    cmd = args[0].lower()
+    if cmd in ("major", "minor", "patch", "release", "prerelease"):
         old_version = read_version()
-        if "-" in old_version and cmd == "patch":
+        if cmd == "patch" and "-" in old_version:
             new_version = old_version.split("-")[0]
+        elif cmd == "prerelease" and "-" not in old_version:
+            new_version = bump_version(old_version, "patch")
+            new_version = bump_version(new_version, cmd)
         else:
+            print(111, old_version, cmd)
             new_version = bump_version(old_version, cmd)
         write_version(new_version)
         print(f"Version bumped: {old_version} -> {new_version}")
-    elif cmd == "set" and len(sys.argv) == 3:
-        new_version = sys.argv[2]
+    elif cmd == "set" and len(args) == 2:
+        new_version = args[1]
         try:
             semver.VersionInfo.parse(new_version)
-        except Exception:
+            write_version(new_version)
+            print(f"Version set to: {new_version}")
+        except ValueError:
             print(f"Invalid semver: {new_version}")
-            return
-        write_version(new_version)
-        print(f"Version set to: {new_version}")
     elif cmd == "get":
         print(read_version())
     else:
-        print(
-            "Invalid command. Usage: python version_manager.py [patch|minor|major|prerelease|set <version>|get]"
-        )
+        print(f"Invalid command.\n{usage}")
 
 
 if __name__ == "__main__":
