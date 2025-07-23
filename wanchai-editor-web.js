@@ -237,11 +237,12 @@ function stripQuotes(s) {
   return s;
 }
 
-// 8. 其它功能（批量操作、导出、编辑弹窗、右键菜单、拖拽排序等）
-// ... 这里建议分模块补充
-
 // 9. 导出INI
 function handleExport() {
+  if (!iniFileName) {
+    showAutoDismissMessage("Please select an ini file first.");
+    return
+  }
   // 重新组装INI内容
   let content = `[Info]\nUnitCount=${document.getElementById('unitCount').value}\nExport Date=${document.getElementById('exportDate').value}\n\n`;
   skuList.forEach(sku => {
