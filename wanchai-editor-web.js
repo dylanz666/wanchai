@@ -665,6 +665,10 @@ function enableContextMenu() {
 function insertTestItem(rowIndex, before = true) {
   let rows = allRowsWithSku.filter(item => item.sku === currentSku);
   let insertAt = before ? rowIndex : rowIndex + 1;
+  // 修正：如果是 after 且插入点超出当前 SKU 行数，插入到末尾
+  if (!before && insertAt >= rows.length) {
+    insertAt = rows.length;
+  }
   // 构造空行
   let newRow = [
     (insertAt + 1).toString(), // Index
@@ -676,6 +680,16 @@ function insertTestItem(rowIndex, before = true) {
     if (allRowsWithSku[i].sku === currentSku) {
       if (count === insertAt) { globalIdx = i; break; }
       count++;
+    }
+  }
+  // 如果插入点超出所有当前 SKU 行，则插入到最后
+  if (insertAt === rows.length) {
+    // 找到最后一个当前 SKU 的 globalIdx
+    for (let i = allRowsWithSku.length - 1; i >= 0; --i) {
+      if (allRowsWithSku[i].sku === currentSku) {
+        globalIdx = i + 1;
+        break;
+      }
     }
   }
   allRowsWithSku.splice(globalIdx, 0, { row: newRow.slice(), sku: currentSku });
