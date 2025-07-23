@@ -38,7 +38,7 @@ document.getElementById('searchInput').addEventListener('input', e => {
 });
 document.getElementById('btnUpdateDate').addEventListener('click', updateExportDate);
 
-// 自定义 confirm 弹窗
+// 自定义 confirm 弹窗（带过渡动画）
 function customConfirm(message, onConfirm) {
   // 移除已有弹窗
   let old = document.getElementById('customConfirmModal');
@@ -53,8 +53,12 @@ function customConfirm(message, onConfirm) {
   modal.style.height = '100vh';
   modal.style.background = 'rgba(0,0,0,0.25)';
   modal.style.zIndex = 99999;
+  modal.style.opacity = '0';
+  modal.style.transition = 'opacity 0.25s';
+
+  // 弹窗内容带淡入淡出
   modal.innerHTML = `
-    <div style="position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);background:#fff;padding:32px 32px 24px 32px;border-radius:10px;box-shadow:0 4px 24px #0002;min-width:340px;max-width:90vw;">
+    <div id="customConfirmBox" style="position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);background:#fff;padding:32px 32px 24px 32px;border-radius:10px;box-shadow:0 4px 24px #0002;min-width:340px;max-width:90vw;opacity:0;transition:opacity 0.25s;">
       <div style="font-size:18px;font-weight:bold;margin-bottom:12px;">Confirm</div>
       <div style="margin-bottom:24px;white-space:pre-line;">${message}</div>
       <div style="text-align:right;">        
@@ -64,16 +68,50 @@ function customConfirm(message, onConfirm) {
       </div>
     </div>
   `;
-  // style="display:none;"
   document.body.appendChild(modal);
-  // 
+
+  // 触发淡入
+  setTimeout(() => {
+    modal.style.opacity = '1';
+    const box = document.getElementById('customConfirmBox');
+    if (box) box.style.opacity = '1';
+  }, 10);
+
+  function closeModal() {
+    // 淡出动画
+    modal.style.opacity = '0';
+    const box = document.getElementById('customConfirmBox');
+    if (box) box.style.opacity = '0';
+    setTimeout(() => {
+      if (modal.parentNode) modal.parentNode.removeChild(modal);
+    }, 250);
+  }
+
   document.getElementById('customConfirmCancel').onclick = function () {
-    modal.remove();
+    closeModal();
   };
   document.getElementById('customConfirmOk').onclick = function () {
-    modal.remove();
+    closeModal();
     if (onConfirm) onConfirm();
   };
+
+  // 支持ESC关闭
+  setTimeout(() => {
+    modal.focus();
+    window.addEventListener('keydown', escHandler);
+  }, 20);
+  function escHandler(e) {
+    if (e.key === "Escape") {
+      closeModal();
+      window.removeEventListener('keydown', escHandler);
+    }
+  }
+  // 点击遮罩关闭
+  modal.addEventListener('mousedown', function (e) {
+    if (e.target === modal) {
+      closeModal();
+    }
+  });
 }
 
 // Reload 二次确认
@@ -326,8 +364,9 @@ function addSuffixToCurrentSku() {
 // Add suffixes: 所有 SKU 批量添加后缀
 function addSuffixToAllSkus() {
   const suffix = document.getElementById('skuSuffix').value;
-  if (!suffix) {
-    alert('Suffix cannot be empty!');
+  const sku = document.getElementById('skuSelect').value;
+  if (!sku || !suffix) {
+    alert('SKU and Suffix cannot be empty!');
     return;
   }
   const newSkuList = skuList.map(sku => sku + suffix);
