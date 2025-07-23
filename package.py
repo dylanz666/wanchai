@@ -35,7 +35,7 @@ def main():
     ]
     print(" ".join(cmd))
     try:
-        # result = subprocess.run(cmd, check=True)
+        result = subprocess.run(cmd, check=True)
         print("Build completed successfully.")
     except subprocess.CalledProcessError as e:
         print(f"Build failed: {e}")
