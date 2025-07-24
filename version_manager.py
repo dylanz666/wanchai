@@ -58,7 +58,6 @@ def main():
             new_version = bump_version(old_version, "patch")
             new_version = bump_version(new_version, cmd)
         else:
-            print(111, old_version, cmd)
             new_version = bump_version(old_version, cmd)
         write_version(new_version)
         print(f"Version bumped: {old_version} -> {new_version}")
